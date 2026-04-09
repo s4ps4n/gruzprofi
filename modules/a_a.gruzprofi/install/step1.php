@@ -8,7 +8,7 @@ Loc::loadMessages(__FILE__);
 <form action="<?= $APPLICATION->GetCurPage() ?>" method="POST">
     <?= bitrix_sessid_post() ?>
     <input type="hidden" name="lang" value="<?= LANG ?>">
-    <input type="hidden" name="id" value="mycompany.gruzprofi">
+    <input type="hidden" name="id" value="a_a.gruzprofi">
     <input type="hidden" name="install" value="Y">
     <input type="hidden" name="step" value="2">
     

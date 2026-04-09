@@ -39,8 +39,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST["inline_save"]) && $APP
 }
 ?>
 
-<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-
 <style>
 .editor-modal-overlay {
     position: fixed;
@@ -216,14 +214,7 @@ function saveContent() {
                 currentEditElement.innerText = newValue;
             }
             closeEditor();
-            
-            Swal.fire({
-                icon: 'success',
-                title: 'Сохранено!',
-                text: 'Текст обновлен',
-                timer: 1500,
-                showConfirmButton: false
-            });
+            alert('Сохранено! Текст обновлен');
         } else {
             throw new Error('Ошибка сохранения');
         }
@@ -231,12 +222,7 @@ function saveContent() {
     .catch(error => {
         saveBtn.innerText = originalText;
         saveBtn.disabled = false;
-        Swal.fire({
-            icon: 'error',
-            title: 'Ошибка',
-            text: 'Не удалось сохранить изменения',
-            confirmButtonColor: '#FF6B35'
-        });
+        alert('Не удалось сохранить изменения');
     });
 }
 </script>

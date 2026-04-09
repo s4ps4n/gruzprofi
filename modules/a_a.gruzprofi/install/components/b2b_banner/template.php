@@ -86,15 +86,7 @@ if (!empty($arItem["PROPERTIES"]["TG_LINK"]["VALUE"])) {
     }
 }
 if (empty($tgLink)) {
-    $tgLink = "/local/include/telegram.php";
-// Или если нужно получить именно URL из файла:
-ob_start();
-include($_SERVER["DOCUMENT_ROOT"] . "/local/include/telegram.php");
-$telegramContent = ob_get_clean();
-
-// Извлекаем ссылку из содержимого
-preg_match('/href="([^"]+)"/', $telegramContent, $matches);
-$tgLink = $matches[1] ?? "https://t.me/username";
+    $tgLink = "https://t.me/username";
 }
 
 // Безопасно получаем текст кнопки

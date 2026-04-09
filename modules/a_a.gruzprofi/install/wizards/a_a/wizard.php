@@ -112,6 +112,16 @@ class Step2 extends CWizardStep
         ]);
         $this->content .= '</td></tr>';
         
+        // Яндекс.Карты API-ключ
+        $this->content .= '<tr><th style="text-align:right; padding:8px;">Яндекс.Карты API-ключ:</th><td>';
+        $this->content .= $this->ShowInputField('text', 'YANDEX_MAPS_API_KEY', [
+            'value' => '',
+            'size' => 50,
+            'style' => 'width:400px; padding:6px;'
+        ]);
+        $this->content .= '<br><small>Получить ключ можно в <a href="https://developer.tech.yandex.ru/" target="_blank">Кабинете разработчика Яндекса</a>. Если оставить пустым, карта может работать с ограничениями.</small>';
+        $this->content .= '</td></tr>';
+        
         $this->content .= '</table>';
     }
 
@@ -126,6 +136,7 @@ class Step2 extends CWizardStep
         $wizard->SetVar('TELEGRAM_LINK', $_POST['TELEGRAM_LINK']);
         $wizard->SetVar('INN', $_POST['INN']);
         $wizard->SetVar('OGRN', $_POST['OGRN']);
+        $wizard->SetVar('YANDEX_MAPS_API_KEY', $_POST['YANDEX_MAPS_API_KEY']);
     }
 }
 
@@ -141,63 +152,102 @@ class Step3 extends CWizardStep
     }
 
     public function ShowStep()
-    {
-        $this->content = '<div style="padding:20px;">';
-        $this->content .= '<p>Идёт установка данных...</p>';
+{
+    $this->content = '<div style="padding:20px;">';
+    $this->content .= '<p>Идёт установка данных...</p>';
+    
+    $results = [];
+    $hasError = false;
+    
+    try {
+        // Выполняем установку и собираем результаты
+        $results = $this->InstallData();
         
-        try {
-            // Выполняем установку
-            $result = $this->InstallData();
-            
-            $this->content .= '<ul style="color:green;">';
-            $this->content .= '<li>✓ Тип инфоблоков создан</li>';
-            $this->content .= '<li>✓ Инфоблок "Автопарк" создан и заполнен</li>';
-            $this->content .= '<li>✓ Инфоблок "Преимущества" создан и заполнен</li>';
-            $this->content .= '<li>✓ Инфоблок "Тарифы калькулятора" создан и заполнен</li>';
-            $this->content .= '<li>✓ Инфоблок "Контент хедера" создан и заполнен</li>';
-            $this->content .= '<li>✓ Инфоблок "B2B баннер" создан</li>';
-            $this->content .= '<li>✓ Инфоблок "Отзывы" создан и заполнен</li>';
-            $this->content .= '<li>✓ Инфоблок "Контакты" создан</li>';
-            $this->content .= '<li>✓ Инфоблок "Услуги" создан</li>';
-            $this->content .= '<li>✓ Шаблон сайта скопирован</li>';
-            $this->content .= '<li>✓ Включаемые области скопированы и обновлены</li>';
-            $this->content .= '<li>✓ Страницы сайта созданы</li>';
-            $this->content .= '<li>✓ Настройки применены</li>';
-            $this->content .= '</ul>';
-            
-        } catch (Exception $e) {
-            $this->content .= '<p style="color:red;">Ошибка: ' . $e->getMessage() . '</p>';
+        $this->content .= '<ul style="color:green;">';
+        foreach ($results as $result) {
+            if ($result['success']) {
+                $this->content .= '<li>✓ ' . htmlspecialchars($result['message']) . '</li>';
+            } else {
+                $this->content .= '<li style="color:red;">✗ ' . htmlspecialchars($result['message']) . '</li>';
+                $hasError = true;
+            }
+        }
+        $this->content .= '</ul>';
+        
+        if ($hasError) {
+            $this->content .= '<p style="color:red;">Установка завершена с ошибками. Проверьте права доступа и повторите попытку.</p>';
         }
         
-        $this->content .= '</div>';
+    } catch (Exception $e) {
+        $this->content .= '<p style="color:red;">Ошибка: ' . htmlspecialchars($e->getMessage()) . '</p>';
+        $hasError = true;
     }
+    
+    if ($hasError) {
+        $this->SetNextStep("SiteSettingsStep");
+        $this->SetNextCaption("Назад к настройкам");
+    }
+    
+    $this->content .= '</div>';
+}
 
     protected function InstallData()
-    {
-        $wizard = $this->GetWizard();
-        
+{
+    $wizard = $this->GetWizard();
+    $results = [];
+    
+    try {
         // Создаём тип инфоблоков
         $this->CreateIBlockType();
-        
+        $results[] = ['success' => true, 'message' => 'Тип инфоблоков создан'];
+    } catch (Exception $e) {
+        $results[] = ['success' => false, 'message' => 'Ошибка создания типа инфоблоков: ' . $e->getMessage()];
+        return $results;
+    }
+    
+    try {
         // Создаём инфоблоки и импортируем данные
         $iblocks = $this->CreateAllIBlocks();
         
-        // Сохраняем ID инфоблоков в переменные мастера
         foreach ($iblocks as $code => $id) {
-            $wizard->SetVar('IBLOCK_' . $code, $id);
+            if ($id > 0) {
+                $results[] = ['success' => true, 'message' => 'Инфоблок "' . $code . '" создан'];
+                $wizard->SetVar('IBLOCK_' . $code, $id);
+            } else {
+                $results[] = ['success' => false, 'message' => 'Инфоблок "' . $code . '" не создан'];
+            }
         }
-        
+    } catch (Exception $e) {
+        $results[] = ['success' => false, 'message' => 'Ошибка создания инфоблоков: ' . $e->getMessage()];
+        return $results;
+    }
+    
+    try {
         // Копируем шаблон сайта
         $this->CopyTemplate();
-        
+        $results[] = ['success' => true, 'message' => 'Шаблон сайта скопирован'];
+    } catch (Exception $e) {
+        $results[] = ['success' => false, 'message' => 'Ошибка копирования шаблона: ' . $e->getMessage()];
+    }
+    
+    try {
         // Копируем и обновляем включаемые области
         $this->CopyAndUpdateIncludeAreas();
-        
-        // Создаём страницы сайта
-        $this->CreatePages($iblocks);
-        
-        return true;
+        $results[] = ['success' => true, 'message' => 'Включаемые области обновлены'];
+    } catch (Exception $e) {
+        $results[] = ['success' => false, 'message' => 'Ошибка обновления включаемых областей: ' . $e->getMessage()];
     }
+    
+    try {
+        // Создаём страницы сайта
+        $this->CreatePages($iblocks ?? []);
+        $results[] = ['success' => true, 'message' => 'Страницы сайта созданы'];
+    } catch (Exception $e) {
+        $results[] = ['success' => false, 'message' => 'Ошибка создания страниц: ' . $e->getMessage()];
+    }
+    
+    return $results;
+}
 
     protected function CreateIBlockType()
     {
@@ -270,17 +320,17 @@ class Step3 extends CWizardStep
     protected function CreateIBlock($code, $name)
     {
         $iblock = new CIBlock;
-        
-        // Проверяем, существует ли уже
+
+        // Проверяем, существует ли уже (ищем по коду как есть)
         $res = CIBlock::GetList([], ['CODE' => $code]);
         if ($arRes = $res->Fetch()) {
             return $arRes['ID'];
         }
-        
+
         $arFields = [
             'ACTIVE' => 'Y',
             'NAME' => $name,
-            'CODE' => $code,
+            'CODE' => $code, // оставляем как есть, без strtolower
             'API_CODE' => $code,
             'IBLOCK_TYPE_ID' => 'gruzprofi_content',
             'SITE_ID' => [CSite::GetDefSite()],
@@ -288,10 +338,9 @@ class Step3 extends CWizardStep
             'VERSION' => 1,
             'GROUP_ID' => ['2' => 'R']
         ];
-        
+
         return $iblock->Add($arFields);
     }
-
     protected function ImportIBlockXML($iblockId, $xmlFile)
     {
         if (!file_exists($xmlFile)) {
@@ -417,7 +466,7 @@ class Step3 extends CWizardStep
     {
         $wizard = $this->GetWizard();
         
-        $includeSource = __DIR__ . '/../../demo_data/include_areas';
+        $includeSource = __DIR__ . '/../../files/templates/gruzprofi/include_areas';
         $includeDest = $_SERVER['DOCUMENT_ROOT'] . '/local/include';
         
         if (!is_dir($includeDest)) {
@@ -428,17 +477,18 @@ class Step3 extends CWizardStep
         CopyDirFiles($includeSource, $includeDest, true, true);
         
         // Обновляем значения из мастера
-        $updates = [
-            'phone.php' => $wizard->GetVar('PHONE'),
-            'work_hours.php' => $wizard->GetVar('WORK_HOURS'),
-            'footer_phone.php' => $wizard->GetVar('PHONE'),
-            'footer_email.php' => $wizard->GetVar('EMAIL'),
-            'footer_work_hours.php' => $wizard->GetVar('WORK_HOURS'),
-            'footer_company_name.php' => $wizard->GetVar('COMPANY_NAME'),
-            'footer_inn.php' => $wizard->GetVar('INN'),
-            'footer_ogrn.php' => $wizard->GetVar('OGRN'),
-            'telegram.php' => $this->generateTelegramContent($wizard->GetVar('TELEGRAM_LINK')),
-        ];
+    $updates = [
+        'phone.php' => $wizard->GetVar('PHONE'),
+        'phone_link.php' => 'tel:' . preg_replace('/[^0-9+]/', '', $wizard->GetVar('PHONE')),
+        'work_hours.php' => $wizard->GetVar('WORK_HOURS'),
+        'footer_phone.php' => $wizard->GetVar('PHONE'),
+        'footer_email.php' => $wizard->GetVar('EMAIL'),
+        'footer_work_hours.php' => $wizard->GetVar('WORK_HOURS'),
+        'footer_company_name.php' => $wizard->GetVar('COMPANY_NAME'),
+        'footer_inn.php' => $wizard->GetVar('INN'),
+        'footer_ogrn.php' => $wizard->GetVar('OGRN'),
+        'telegram.php' => $this->generateTelegramContent($wizard->GetVar('TELEGRAM_LINK')),
+    ];
         
         foreach ($updates as $file => $content) {
             $filePath = $includeDest . '/' . $file;
@@ -468,38 +518,72 @@ class Step3 extends CWizardStep
 </a>';
     }
 
-    protected function CreatePages($iblocks)
-    {
-        $siteId = CSite::GetDefSite();
+protected function CreatePages($iblocks)
+{
+    $siteId = CSite::GetDefSite();
+    $wizard = $this->GetWizard();
+    $email = $wizard->GetVar('EMAIL') ?: 'info@gruzprofi.ru';
+    
+    // Главная страница
+    $indexPath = $_SERVER['DOCUMENT_ROOT'] . '/index.php';
+    $backupPath = $_SERVER['DOCUMENT_ROOT'] . '/index_backup_' . date('Ymd_His') . '.php';
+    
+    // Проверяем, существует ли index.php и не пустой ли он
+    if (file_exists($indexPath) && filesize($indexPath) > 0) {
+        // Читаем существующий файл
+        $existingContent = file_get_contents($indexPath);
         
-        // Главная страница
-        $indexContent = $this->generateIndexPage($iblocks);
-        file_put_contents($_SERVER['DOCUMENT_ROOT'] . '/index.php', $indexContent);
-        
-        // Страница политики конфиденциальности
-        $privacyContent = $this->generatePrivacyPage();
-        if (!is_dir($_SERVER['DOCUMENT_ROOT'] . '/privacy')) {
-            mkdir($_SERVER['DOCUMENT_ROOT'] . '/privacy', 0755, true);
-        }
-        file_put_contents($_SERVER['DOCUMENT_ROOT'] . '/privacy/index.php', $privacyContent);
-        
-        // Копируем 404 страницу если есть
-        $notFoundSource = __DIR__ . '/../../demo_data/pages/404.php';
-        if (file_exists($notFoundSource)) {
-            copy($notFoundSource, $_SERVER['DOCUMENT_ROOT'] . '/404.php');
+        // Проверяем, не создан ли он уже нашим модулем
+        if (strpos($existingContent, 'Грузоперевозки и переезды с фиксированной ценой') === false) {
+            // Это чужой index.php - делаем бэкап
+            copy($indexPath, $backupPath);
+            
+            // Записываем в лог
+            $wizard->SetVar('INDEX_BACKUP', $backupPath);
         }
     }
     
+    // Создаём новый index.php
+    $indexContent = $this->generateIndexPage($iblocks);
+    file_put_contents($indexPath, $indexContent);
+    
+    // Страница политики конфиденциальности
+    $privacyDir = $_SERVER['DOCUMENT_ROOT'] . '/privacy';
+    $privacyPath = $privacyDir . '/index.php';
+    
+    if (!is_dir($privacyDir)) {
+        mkdir($privacyDir, 0755, true);
+    }
+    
+    // Проверяем существование privacy
+    if (file_exists($privacyPath) && filesize($privacyPath) > 0) {
+        $existingPrivacy = file_get_contents($privacyPath);
+        if (strpos($existingPrivacy, 'Политика конфиденциальности') === false) {
+            // Бэкапим чужую страницу
+            copy($privacyPath, $privacyDir . '/index_backup_' . date('Ymd_His') . '.php');
+        }
+    }
+    
+    $privacyContent = $this->generatePrivacyPage($email);
+    file_put_contents($privacyPath, $privacyContent);
+    
+    // Устанавливаем шаблон для главной
+    $this->SetTemplateForPage('/', 'gruzprofi');
+}
+    
     protected function generateIndexPage($iblocks)
-    {
-        $heroIblock = $iblocks['HERO_CONTENT'] ?? 1;
-        $fleetIblock = $iblocks['FLEET'] ?? 1;
-        $featuresIblock = $iblocks['FEATURES'] ?? 1;
-        $calcIblock = $iblocks['CALC_TARIFFS'] ?? 1;
-        $reviewsIblock = $iblocks['REVIEWS'] ?? 1;
-        $b2bIblock = $iblocks['B2B_BANNER'] ?? 1;
-        
-        return '<?php
+{
+    $heroIblock = $iblocks['HERO_CONTENT'] ?? 1;
+    $fleetIblock = $iblocks['FLEET'] ?? 1;
+    $featuresIblock = $iblocks['FEATURES'] ?? 1;
+    $calcIblock = $iblocks['CALC_TARIFFS'] ?? 1;
+    $reviewsIblock = $iblocks['REVIEWS'] ?? 1;
+    $b2bIblock = $iblocks['B2B_BANNER'] ?? 1;
+    
+    $apiKey = $this->GetWizard()->GetVar('YANDEX_MAPS_API_KEY');
+    $apiKeyParam = $apiKey ? '?apikey=' . htmlspecialchars($apiKey) . '&lang=ru_RU' : '?lang=ru_RU';
+    
+    return '<?php
 require($_SERVER["DOCUMENT_ROOT"]."/bitrix/header.php");
 $APPLICATION->SetTitle("Грузоперевозки и переезды с фиксированной ценой");
 
@@ -524,7 +608,7 @@ window.CARS_ONLINE = <?= json_encode([
                 "hero_content",
                 [
                     "IBLOCK_TYPE" => "gruzprofi_content",
-                    "IBLOCK_CODE" => "hero_content",
+                    "IBLOCK_CODE" => "HERO_CONTENT",
                     "NEWS_COUNT" => "1",
                     "CACHE_TYPE" => "A",
                     "CACHE_TIME" => "36000",
@@ -537,7 +621,7 @@ window.CARS_ONLINE = <?= json_encode([
             "calculator_template",
             [
                 "IBLOCK_TYPE" => "gruzprofi_content",
-                "IBLOCK_CODE" => "calc_tariffs",
+                "IBLOCK_CODE" => "CALC_TARIFFS",
                 "NEWS_COUNT" => "20",
                 "CACHE_TYPE" => "A",
                 "CACHE_TIME" => "36000",
@@ -555,7 +639,7 @@ window.CARS_ONLINE = <?= json_encode([
             "features_grid",
             [
                 "IBLOCK_TYPE" => "gruzprofi_content",
-                "IBLOCK_CODE" => "features",
+                "IBLOCK_CODE" => "FEATURES",
                 "NEWS_COUNT" => "20",
                 "CACHE_TYPE" => "A",
                 "CACHE_TIME" => "36000",
@@ -573,7 +657,7 @@ window.CARS_ONLINE = <?= json_encode([
             "fleet_grid",
             [
                 "IBLOCK_TYPE" => "gruzprofi_content",
-                "IBLOCK_CODE" => "fleet",
+                "IBLOCK_CODE" => "FLEET",
                 "NEWS_COUNT" => "20",
                 "CACHE_TYPE" => "A",
                 "CACHE_TIME" => "36000",
@@ -590,7 +674,7 @@ window.CARS_ONLINE = <?= json_encode([
             "b2b_banner",
             [
                 "IBLOCK_TYPE" => "gruzprofi_content",
-                "IBLOCK_CODE" => "b2b_banner",
+                "IBLOCK_CODE" => "B2B_BANNER",
                 "NEWS_COUNT" => "1",
                 "CACHE_TYPE" => "N",
             ]
@@ -604,15 +688,15 @@ window.CARS_ONLINE = <?= json_encode([
         <h2><?$APPLICATION->IncludeFile("/local/include/map_title.php", [], ["MODE" => "text"])?></h2>
         <div class="map-wrapper" style="position:relative;">
             <div class="map-ui" style="position:absolute; top:20px; right:20px; background:#fff; padding:10px 20px; border-radius:12px; z-index:10;">
-                <strong>14 машин свободно</strong>
-                <span style="margin-left:10px;">Среднее время подачи: 32 минуты</span>
+                <strong>Машины в вашем районе</strong>
+                <span style="margin-left:10px;">Оперативная подача</span>
             </div>
             <div id="yandex-map" style="width:100%; height:450px; border-radius:24px; overflow:hidden;"></div>
         </div>
     </div>
 </section>
 
-<script src="https://api-maps.yandex.ru/2.1/?lang=ru_RU"></script>
+<script src="https://api-maps.yandex.ru/2.1/' . $apiKeyParam . '"></script>
 <script>
 function initMap() {
     if (typeof ymaps === "undefined") return setTimeout(initMap, 500);
@@ -645,7 +729,7 @@ document.addEventListener("DOMContentLoaded", initMap);
             "reviews_list",
             [
                 "IBLOCK_TYPE" => "gruzprofi_content",
-                "IBLOCK_CODE" => "reviews",
+                "IBLOCK_CODE" => "REVIEWS",
                 "NEWS_COUNT" => "20",
                 "CACHE_TYPE" => "A",
                 "CACHE_TIME" => "36000",
@@ -655,11 +739,11 @@ document.addEventListener("DOMContentLoaded", initMap);
 </section>
 
 <?php require($_SERVER["DOCUMENT_ROOT"]."/bitrix/footer.php"); ?>';
-    }
+}
     
-    protected function generatePrivacyPage()
-    {
-        return '<?php
+protected function generatePrivacyPage($email = 'info@gruzprofi.ru')
+{
+    return '<?php
 require($_SERVER["DOCUMENT_ROOT"]."/bitrix/header.php");
 $APPLICATION->SetTitle("Политика конфиденциальности");
 ?>
@@ -685,13 +769,13 @@ $APPLICATION->SetTitle("Политика конфиденциальности");
     <p>Цель обработки персональных данных Пользователя — информирование Пользователя посредством отправки электронных писем; заключение, исполнение и прекращение гражданско-правовых договоров.</p>
     
     <h2>5. Контакты</h2>
-    <p>Все предложения или вопросы по настоящей Политике конфиденциальности следует сообщать на email: ' . htmlspecialchars($this->GetWizard()->GetVar('EMAIL')) . '</p>
+    <p>Все предложения или вопросы по настоящей Политике конфиденциальности следует сообщать на email: ' . htmlspecialchars($email) . '</p>
     
     <p><a href="/">← Вернуться на главную</a></p>
 </div>
 
 <?php require($_SERVER["DOCUMENT_ROOT"]."/bitrix/footer.php"); ?>';
-    }
+}
 }
 
 class Step4 extends CWizardStep
@@ -703,22 +787,33 @@ class Step4 extends CWizardStep
         $this->SetCancelStep("FinishStep");
     }
 
-    public function ShowStep()
-    {
-        $this->content = '<div style="padding:30px; text-align:center;">';
-        $this->content .= '<h2 style="color:#2c3e66;">🎉 Поздравляем!</h2>';
-        $this->content .= '<p style="font-size:1.2em;">Сайт грузоперевозок "ГрузПрофи" успешно установлен.</p>';
-        $this->content .= '<br>';
-        $this->content .= '<p><a href="/" class="adm-btn adm-btn-save" style="padding:12px 30px; font-size:1.1em;">Перейти на сайт</a></p>';
-        $this->content .= '<br>';
-        $this->content .= '<p style="color:#888; font-size:0.9em;">Для редактирования контента используйте административную панель Битрикс.</p>';
-        $this->content .= '<p style="color:#888; font-size:0.9em;">Инфоблоки находятся в разделе "Контент" → "Контент ГрузПрофи".</p>';
-        $this->content .= '</div>';
+public function ShowStep()
+{
+    $wizard = $this->GetWizard();
+    $backupPath = $wizard->GetVar('INDEX_BACKUP');
+    
+    $this->content = '<div style="padding:30px; text-align:center;">';
+    $this->content .= '<h2 style="color:#2c3e66;">🎉 Поздравляем!</h2>';
+    $this->content .= '<p style="font-size:1.2em;">Сайт грузоперевозок "ГрузПрофи" успешно установлен.</p>';
+    
+    if ($backupPath) {
+        $this->content .= '<p style="color:#e67e22; background:#fef5e7; padding:15px; border-radius:8px; margin:20px 0;">';
+        $this->content .= '⚠️ Внимание: существующий файл index.php был заменён.<br>';
+        $this->content .= 'Резервная копия сохранена: <br><code>' . htmlspecialchars($backupPath) . '</code>';
+        $this->content .= '</p>';
     }
+    
+    $this->content .= '<br>';
+    $this->content .= '<p><a href="/" class="adm-btn adm-btn-save" style="padding:12px 30px; font-size:1.1em;">Перейти на сайт</a></p>';
+    $this->content .= '<br>';
+    $this->content .= '<p style="color:#888; font-size:0.9em;">Для редактирования контента используйте административную панель Битрикс.</p>';
+    $this->content .= '<p style="color:#888; font-size:0.9em;">Инфоблоки находятся в разделе "Контент" → "Контент ГрузПрофи".</p>';
+    $this->content .= '</div>';
+}
 }
 
 // Регистрируем шаги
-$wizard = new CWizard("mycompany:gruzprofi");
+$wizard = new CWizard("a_a:gruzprofi");
 $wizard->AddStep(new Step1);
 $wizard->AddStep(new Step2);
 $wizard->AddStep(new Step3);

@@ -67,7 +67,7 @@ if (!defined("B_PROLOG_INCLUDED") || B_PROLOG_INCLUDED !== true) die();
         </div>
     </div>
     
-<button class="btn btn-primary calc-btn" onclick="openOrderModal()">Забронировать по этой цене</button>
+    <button class="btn btn-primary calc-btn">Забронировать по этой цене</button>
     <p style="font-size:0.8rem;color:#888;text-align:center;margin-top:12px;">
         Цена окончательная и фиксируется в договоре
     </p>
@@ -101,26 +101,4 @@ document.addEventListener('change', function(e) {
         updateCalc();
     }
 });
-</script>
-<script>
-function openOrderModal() {
-    var total = document.getElementById('calc-total').innerText;
-    var typeSelect = document.getElementById('calc-type');
-    var typeText = typeSelect.options[typeSelect.selectedIndex].text;
-    var moversSelect = document.getElementById('calc-movers');
-    var moversText = moversSelect.options[moversSelect.selectedIndex].text;
-    
-    var message = encodeURIComponent(
-        'Здравствуйте! Хочу заказать переезд:\n' +
-        'Тип: ' + typeText + '\n' +
-        'Грузчики: ' + moversText + '\n' +
-        'Итого: ' + total
-    );
-    
-    // Открываем Telegram для связи
-    window.open('https://t.me/username?text=' + message, '_blank');
-    
-    // Или если нужно показать телефон:
-    // alert('Позвоните нам: +7 (999) 123-45-67\n\n' + message.replace(/\+/g, ' '));
-}
 </script>
